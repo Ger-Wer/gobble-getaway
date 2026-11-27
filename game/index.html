@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mabel's Gobble-Getaway</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #3d2412; }
+  /* The game field is a fixed 1280x720 stage, scaled to the window. Canvas
+     and text live in the same stage, so they line up at any size. */
+  #stage { position: fixed; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+  #game { width: 1280px; height: 720px; display: block; touch-action: none; }
+  #ui { position: absolute; inset: 0; pointer-events: none; user-select: none; -webkit-user-select: none; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  [hidden] { display: none !important; }
+
+  .panel { position: absolute; background: rgba(34, 21, 12, 0.82); border: 2px solid rgba(255, 226, 178, 0.5); border-radius: 12px; }
+  .hud-label { position: absolute; left: 16px; top: 11px; font-size: 15px; font-weight: 700; color: #ffd98f; letter-spacing: 1px; }
+  .center-line { position: absolute; left: 0; right: 0; text-align: center; }
+
+  /* ---------- HUD ---------- */
+  #p-score { left: 18px; top: 16px; width: 224px; height: 64px; }
+  #hud-score-v { position: absolute; left: 16px; top: 28px; font-size: 30px; font-weight: 800; color: #fff3dd; }
+  #p-progress { left: 320px; top: 16px; width: 640px; height: 64px; }
+  #prog-track { position: absolute; left: 32px; top: 18px; width: 576px; height: 16px; background: rgba(255, 243, 221, 0.22); border-radius: 8px; }
+  #prog-fill { position: absolute; left: 0; top: 0; height: 16px; width: 3%; background: #fff3dd; border-radius: 8px; }
+  .prog-tick { position: absolute; top: 14px; width: 4px; height: 24px; background: rgba(61, 36, 18, 0.7); }
+  #tick-1 { left: 224px; }
+  #tick-2 { left: 416px; }
+  #icon-barn { position: absolute; left: 12px; top: 30px; width: 16px; height: 12px; background: #a8402f; border-radius: 2px; }
+  #icon-barn::before { content: ""; position: absolute; left: -2px; top: -5px; width: 20px; height: 5px; background: #5f3323; }
+  #icon-window { position: absolute; left: 616px; top: 28px; width: 14px; height: 14px; background: #f0e0bd; border-radius: 2px; }
+  #icon-window::before { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; background: #f2a65a; }
+  #hud-dist { position: absolute; left: 0; right: 0; top: 45px; text-align: center; font-size: 17px; font-weight: 700; color: #fff3dd; }
+  #p-lives { left: 1002px; top: 16px; width: 260px; height: 64px; }
+  .drum { position: absolute; top: 35px; width: 26px; height: 18px; background: #e8842c; border-radius: 50% 50% 45% 45%; }
+  .drum::before { content: ""; position: absolute; right: -7px; top: 5px; width: 11px; height: 6px; background: #fff3dd; border-radius: 3px; }
+  .drum::after { content: ""; position: absolute; right: -12px; top: 3px; width: 7px; height: 7px; background: #fff3dd; border-radius: 50%; }
+  #drum-0 { left: 47px; }
+  #drum-1 { left: 93px; }
+  #drum-2 { left: 139px; }
+  .drum.lost { background: rgba(255, 243, 221, 0.28); }
+  .drum.lost::before, .drum.lost::after { background: rgba(255, 243, 221, 0.28); }
+  #hud-muted { position: absolute; right: 22px; top: 86px; font-size: 13px; font-weight: 700; color: rgba(255, 243, 221, 0.6); }
+  #hud-hint { position: absolute; left: 0; right: 0; top: 684px; text-align: center; font-size: 16px; font-weight: 700; color: rgba(46, 26, 10, 0.9); }
+
+  /* ---------- title ---------- */
+  #sign-text { position: absolute; left: 390px; top: 165px; width: 500px; height: 150px; }
+  #sign-kicker { position: absolute; left: 0; right: 0; top: 8px; text-align: center; font-size: 30px; font-weight: 800; color: #ffd24c; letter-spacing: 4px; text-shadow: 0 2px 0 rgba(61, 36, 18, 0.55); }
+  #sign-title { position: absolute; left: 0; right: 0; top: 50px; text-align: center; font-size: 52px; font-weight: 800; color: #fff3dd; letter-spacing: 1px; text-shadow: 0 3px 0 rgba(61, 36, 18, 0.55); }
+  #subtitle { top: 319px; font-size: 21px; font-weight: 700; color: #fff3dd; text-shadow: 0 2px 0 rgba(61, 36, 18, 0.4); }
+  #press { top: 455px; font-size: 27px; font-weight: 800; color: #ffd24c; text-shadow: 0 3px 0 rgba(61, 36, 18, 0.6); }
+  #controls-1 { top: 503px; font-size: 16px; font-weight: 700; color: rgba(255, 243, 221, 0.92); text-shadow: 0 1px 0 rgba(61, 36, 18, 0.35); }
+  #controls-2 { top: 531px; font-size: 15px; font-weight: 600; color: rgba(255, 243, 221, 0.75); }
+  #best-tag { left: 980px; top: 100px; width: 282px; height: 56px; }
+  #best-tag span { position: absolute; left: 0; right: 0; top: 11px; text-align: center; font-size: 24px; font-weight: 800; color: #ffd24c; }
+
+  /* ---------- end ---------- */
+  #end-title { top: 368px; font-size: 54px; font-weight: 800; letter-spacing: 2px; }
+  #end-title.win { color: #ffd24c; text-shadow: 0 4px 0 rgba(36, 18, 8, 0.8); }
+  #end-title.lose { color: #ff6b4a; text-shadow: 0 4px 0 rgba(36, 18, 8, 0.8); }
+  #end-reason { top: 424px; font-size: 20px; font-weight: 600; color: #fff3dd; }
+  #end-dist { top: 490px; font-size: 23px; font-weight: 700; color: #ffd98f; }
+  #end-score { top: 526px; font-size: 23px; font-weight: 700; color: #ffd98f; }
+  #end-press { top: 569px; font-size: 24px; font-weight: 800; color: #fff3dd; text-shadow: 0 3px 0 rgba(36, 18, 8, 0.8); }
+
+  /* ---------- pause ---------- */
+  #pause-dim { position: absolute; inset: 0; background: rgba(30, 15, 5, 0.5); }
+  #pause-title { top: 290px; font-size: 60px; font-weight: 800; color: #fff3dd; text-shadow: 0 4px 0 rgba(36, 18, 8, 0.8); }
+  #pause-sub { top: 369px; font-size: 20px; font-weight: 700; color: #fff3dd; }
+
+  /* ---------- banner, toasts, farmer mark ---------- */
+  #banner { top: 126px; font-size: 46px; font-weight: 800; letter-spacing: 3px; color: #ffd24c; text-shadow: 0 3px 0 rgba(61, 36, 18, 0.65); }
+  #banner-sub { top: 182px; font-size: 19px; font-weight: 700; color: #fff3dd; text-shadow: 0 2px 0 rgba(61, 36, 18, 0.45); }
+  .toast { position: absolute; width: 90px; margin-left: -45px; text-align: center; font-size: 20px; font-weight: 800; color: #fff3dd; text-shadow: 0 2px 0 rgba(46, 26, 10, 0.85); }
+  #farmer-mark { position: absolute; width: 24px; margin-left: -12px; text-align: center; font-size: 34px; font-weight: 800; }
+  #farmer-mark.alert { color: #ff6b4a; text-shadow: 0 0 3px #fff3dd, 0 2px 0 #fff3dd; }
+  #farmer-mark.ask { color: #fff3dd; text-shadow: 0 0 3px rgba(61,36,18,.8), 0 2px 0 rgba(61,36,18,.8); }
+
+  /* Read aloud, never shown: the status line screen readers announce. */
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1280" height="720" aria-label="Mabel's Gobble-Getaway: run 900 metres from the farmyard to the farmhouse window, dodging Farmer Brindle, ovens and carving knives"></canvas>
+  <div id="ui">
+    <!-- HUD -->
+    <div id="hud" hidden>
+      <div class="panel" id="p-score"><span class="hud-label">SCORE</span><span id="hud-score-v">000000</span></div>
+      <div class="panel" id="p-progress">
+        <div id="prog-track"><div id="prog-fill"></div></div>
+        <div class="prog-tick" id="tick-1"></div>
+        <div class="prog-tick" id="tick-2"></div>
+        <div id="icon-barn"></div>
+        <div id="icon-window"></div>
+        <div id="hud-dist">0 / 900 m</div>
+      </div>
+      <div class="panel" id="p-lives"><span class="hud-label">LIVES</span><span class="drum" id="drum-0"></span><span class="drum" id="drum-1"></span><span class="drum" id="drum-2"></span></div>
+      <div id="hud-muted" hidden>MUTED (M)</div>
+      <div id="hud-hint">A D / ← → move&nbsp; · &nbsp;SPACE jump, again to flap&nbsp; · &nbsp;S duck&nbsp; · &nbsp;P pause&nbsp; · &nbsp;click: jump + run there</div>
+    </div>
+    <!-- title screen -->
+    <div id="scr-title">
+      <div id="sign-text"><div id="sign-kicker">MABEL'S</div><div id="sign-title">GOBBLE-GETAWAY</div></div>
+      <div class="center-line" id="subtitle">A Thanksgiving escape in three stages</div>
+      <div class="center-line" id="press">PRESS SPACE OR CLICK TO RUN</div>
+      <div class="center-line" id="controls-1">A D / ← → move&nbsp; · &nbsp;SPACE jump, again to flap&nbsp; · &nbsp;S duck&nbsp; · &nbsp;P pause</div>
+      <div class="center-line" id="controls-2">Dodge hay, dogs, ovens and carving knives. Do not be dinner.</div>
+      <div class="panel" id="best-tag" hidden><span id="best-v">BEST 000000</span></div>
+    </div>
+    <!-- end screen -->
+    <div id="scr-end" hidden>
+      <div class="center-line" id="end-title">SHE ESCAPED!</div>
+      <div class="center-line" id="end-reason"></div>
+      <div class="center-line" id="end-dist"></div>
+      <div class="center-line" id="end-score"></div>
+      <div class="center-line" id="end-press">PRESS SPACE OR CLICK TO RUN AGAIN</div>
+    </div>
+    <!-- pause -->
+    <div id="scr-pause" hidden>
+      <div id="pause-dim"></div>
+      <div class="center-line" id="pause-title">PAUSED</div>
+      <div class="center-line" id="pause-sub">Press P or Space to keep running</div>
+    </div>
+    <!-- stage banner, score toasts, farmer mood mark -->
+    <div class="center-line" id="banner" hidden></div>
+    <div class="center-line" id="banner-sub" hidden></div>
+    <div class="toast" id="toast-0" hidden></div>
+    <div class="toast" id="toast-1" hidden></div>
+    <div class="toast" id="toast-2" hidden></div>
+    <div class="toast" id="toast-3" hidden></div>
+    <div class="toast" id="toast-4" hidden></div>
+    <div class="toast" id="toast-5" hidden></div>
+    <div id="farmer-mark" hidden>!</div>
+  </div>
+</div>
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
